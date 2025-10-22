@@ -3,69 +3,111 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Peta Multi Titik dengan Mode & GeoJSON</title>
+  <title>Peta Multi Titik & Polyline (GeoJSON)</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
+
 <body class="bg-gray-100 flex flex-col items-center min-h-screen p-4">
   <div class="w-full max-w-3xl bg-white shadow-lg rounded-2xl p-6 space-y-4">
-    <h1 class="text-2xl font-bold text-center mb-4">Peta Multi Titik</h1>
+    <h1 class="text-2xl font-bold text-center mb-4">
+      Peta Multi Titik (Polyline + GeoJSON)
+    </h1>
 
+    <!-- Input koordinat -->
     <div id="coordinate-inputs" class="space-y-4">
-      <div class="coordinate-group flex flex-col">
-        <div class="flex justify-between items-center mb-1">
-          <label class="font-semibold">Koordinat 1</label>
-          <button class="delete-btn text-red-500 hover:text-red-700 font-bold text-sm">❌</button>
+      <div class="coordinate-group flex items-start space-x-2">
+        <div class="flex-1">
+          <label class="block font-semibold mb-1">Koordinat 1</label>
+          <textarea
+            placeholder="Contoh: 2° 17' 98,507&quot; S 114° 1' 53,128&quot; E"
+            class="w-full border border-gray-300 rounded-md p-2 focus:ring focus:ring-blue-300"
+          ></textarea>
         </div>
-        <textarea
-          placeholder="Masukkan koordinat (contoh: 2° 17' 95,890&quot; S 119° 1' 53,797&quot; E)"
-          class="w-full border border-gray-300 rounded-md p-2 focus:ring focus:ring-blue-300"></textarea>
+        <button
+          class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md mt-6"
+          onclick="removeCoordinate(this)"
+        >
+          ✕
+        </button>
       </div>
     </div>
 
+    <!-- Tombol -->
     <div class="flex flex-wrap gap-2 justify-between">
-      <button id="addCoordinate" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition">+ Tambah Koordinat</button>
-      <button id="markPoints" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition">📍 Tandai Titik</button>
-      <button id="downloadGeoJSON" class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition">💾 Download GeoJSON</button>
+      <button
+        id="addCoordinate"
+        class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition"
+      >
+        Tambah Koordinat
+      </button>
+      <button
+        id="markPoints"
+        class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition"
+      >
+        Tandai Titik
+      </button>
+      <button
+        id="downloadGeoJSON"
+        class="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition"
+      >
+        💾 Download GeoJSON
+      </button>
     </div>
   </div>
 
+  <!-- Peta -->
   <div id="map" class="w-full max-w-6xl h-[600px] md:h-[700px] mt-6 rounded-2xl shadow-lg"></div>
 
+  <!-- Tabel Data Titik -->
+  <div class="w-full max-w-6xl mt-6 bg-white rounded-xl shadow-lg p-4 overflow-x-auto">
+    <h2 class="text-lg font-bold mb-3">Daftar Titik</h2>
+    <table class="min-w-full text-sm text-left border border-gray-200">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="py-2 px-3 border-b">#</th>
+          <th class="py-2 px-3 border-b">Koordinat (DMS)</th>
+          <th class="py-2 px-3 border-b">Koordinat (Desimal)</th>
+          <th class="py-2 px-3 border-b">Mode</th>
+          <th class="py-2 px-3 border-b">Waktu</th>
+        </tr>
+      </thead>
+      <tbody id="pointsTableBody" class="divide-y"></tbody>
+    </table>
+  </div>
+
   <script>
-    // Inisialisasi peta
-    const map = L.map('map').setView([-2.5489, 118.0149], 5);
+    const map = L.map("map").setView([-2.5489, 118.0149], 5);
 
-    const defaultLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    const darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19,
-      attribution: '© CartoDB Dark Matter'
-    });
-
-    const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19,
-      attribution: '© Esri World Imagery'
-    });
-
+    // Layer dasar peta
     const baseLayers = {
-      'Default': defaultLayer,
-      'Gelap': darkLayer,
-      'Satelit': satelliteLayer
+      Default: L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "© OpenStreetMap",
+      }),
+      Gelap: L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        attribution: "© CartoDB",
+      }),
+      Satelit: L.tileLayer(
+        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+        { maxZoom: 19, attribution: "© Esri" }
+      ),
     };
 
-    let currentLayer = defaultLayer;
-    let currentMode = 'Default';
+    let currentLayer = baseLayers["Default"].addTo(map);
+    let currentMode = "Default";
     let markers = [];
+    let polyline = null;
 
-    // Dropdown mode peta
-    const modeControl = L.control({ position: 'topright' });
-    modeControl.onAdd = function () {
-      const div = L.DomUtil.create('div', 'bg-white shadow-lg rounded-lg p-2 text-sm');
+    // Mode kontrol
+    const modeControl = L.control({ position: "topright" });
+    modeControl.onAdd = () => {
+      const div = L.DomUtil.create("div", "bg-white shadow-lg rounded-lg p-2 text-sm");
       div.innerHTML = `
         <label class='font-semibold'>Mode Peta:</label>
         <select id='mapMode' class='ml-2 border border-gray-300 rounded-md p-1'>
@@ -77,134 +119,142 @@
     };
     modeControl.addTo(map);
 
-    // Label mode aktif
-    const modeLabel = L.control({ position: 'bottomleft' });
-    modeLabel.onAdd = function () {
-      const div = L.DomUtil.create('div', 'bg-white bg-opacity-80 px-3 py-1 rounded-md text-sm font-semibold shadow-md');
-      div.id = 'modeLabel';
-      div.innerText = 'Mode: Default';
-      return div;
-    };
-    modeLabel.addTo(map);
-
-    setTimeout(() => map.invalidateSize(), 500);
-
-    document.addEventListener('change', function (e) {
-      if (e.target.id === 'mapMode') {
+    document.addEventListener("change", (e) => {
+      if (e.target.id === "mapMode") {
         const selectedMode = e.target.value;
         if (currentLayer) map.removeLayer(currentLayer);
         currentLayer = baseLayers[selectedMode];
         currentLayer.addTo(map);
         currentMode = selectedMode;
-        document.getElementById('modeLabel').innerText = `Mode: ${selectedMode}`;
       }
     });
 
-    // Tambah koordinat
-    const addCoordinate = document.getElementById('addCoordinate');
-    const coordinateInputs = document.getElementById('coordinate-inputs');
+    // Tambah dan hapus input koordinat
+    const addCoordinate = document.getElementById("addCoordinate");
+    const coordinateInputs = document.getElementById("coordinate-inputs");
+
+    addCoordinate.addEventListener("click", () => {
+      const count = coordinateInputs.children.length + 1;
+      const div = document.createElement("div");
+      div.classList.add("coordinate-group", "flex", "items-start", "space-x-2");
+      div.innerHTML = `
+        <div class="flex-1">
+          <label class='block font-semibold mb-1'>Koordinat ${count}</label>
+          <textarea placeholder='Contoh: 2° 17\' 45,672" S 114° 1\' 28,392" E'
+            class='w-full border border-gray-300 rounded-md p-2 focus:ring focus:ring-blue-300'></textarea>
+        </div>
+        <button class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-md mt-6" onclick="removeCoordinate(this)">✕</button>`;
+      coordinateInputs.appendChild(div);
+      updateLabels();
+    });
+
+    function removeCoordinate(btn) {
+      const groups = document.querySelectorAll(".coordinate-group");
+      if (groups.length > 1) {
+        btn.parentElement.remove();
+        updateLabels();
+      } else {
+        alert("Minimal satu koordinat harus ada!");
+      }
+    }
 
     function updateLabels() {
-      const groups = coordinateInputs.querySelectorAll('.coordinate-group');
-      groups.forEach((group, i) => {
-        const label = group.querySelector('label');
+      document.querySelectorAll(".coordinate-group label").forEach((label, i) => {
         label.textContent = `Koordinat ${i + 1}`;
       });
     }
 
-    addCoordinate.addEventListener('click', () => {
-      const count = coordinateInputs.children.length + 1;
-      const div = document.createElement('div');
-      div.classList.add('coordinate-group', 'flex', 'flex-col');
-      div.innerHTML = `
-        <div class="flex justify-between items-center mb-1">
-          <label class="font-semibold">Koordinat ${count}</label>
-          <button class="delete-btn text-red-500 hover:text-red-700 font-bold text-sm">❌</button>
-        </div>
-        <textarea
-          placeholder="Masukkan koordinat (contoh: 2° 17' 95,890&quot; S 119° 1' 53,797&quot; E)"
-          class="w-full border border-gray-300 rounded-md p-2 focus:ring focus:ring-blue-300"></textarea>`;
-      coordinateInputs.appendChild(div);
-    });
-
-    // Hapus koordinat
-    coordinateInputs.addEventListener('click', (e) => {
-      if (e.target.classList.contains('delete-btn')) {
-        const group = e.target.closest('.coordinate-group');
-        if (group && coordinateInputs.children.length > 1) {
-          group.remove();
-          updateLabels();
-        } else {
-          alert('Minimal harus ada satu koordinat.');
-        }
-      }
-    });
-
-    // Konversi format DMS ke desimal
-    function dmsToDecimal(dms, ref) {
-      const parts = dms.match(/(\d+)°\s*(\d+)'\s*([\d.,]+)\"/);
-      if (!parts) return null;
-      let deg = parseFloat(parts[1]);
-      let min = parseFloat(parts[2]);
-      let sec = parseFloat(parts[3].replace(',', '.'));
-      let dec = deg + (min / 60) + (sec / 3600);
-      if (ref === 'S' || ref === 'W') dec *= -1;
+    // Fungsi konversi DMS ke desimal
+    function dmsToDecimal(dmsStr) {
+      const regex = /(\d+)[°\s]+(\d+)[′']\s*(\d+[,\.]?\d*)["″]?\s*([NSEW])/i;
+      const match = dmsStr.match(regex);
+      if (!match) return null;
+      let deg = parseFloat(match[1]);
+      let min = parseFloat(match[2]);
+      let sec = parseFloat(match[3].replace(",", "."));
+      let dir = match[4].toUpperCase();
+      let dec = deg + min / 60 + sec / 3600;
+      if (dir === "S" || dir === "W") dec *= -1;
       return dec;
     }
 
-    // Parsing teks koordinat
-    function parseCoordinate(coord) {
-      const regex = /(\d+°\s*\d+'\s*[\d.,]+\"\s*[NS])\s+(\d+°\s*\d+'\s*[\d.,]+\"\s*[EW])/;
-      const match = coord.match(regex);
+    // Parsing format input
+    function parseCoordinate(coordStr) {
+      const regex = /(\d+°\s*\d+'\s*[\d,\.]+"?\s*[NS])\s+(\d+°\s*\d+'\s*[\d,\.]+"?\s*[EW])/i;
+      const match = coordStr.match(regex);
       if (!match) return null;
-      const latPart = match[1];
-      const lonPart = match[2];
-      const latRef = latPart.includes('S') ? 'S' : 'N';
-      const lonRef = lonPart.includes('W') ? 'W' : 'E';
-      const lat = dmsToDecimal(latPart, latRef);
-      const lon = dmsToDecimal(lonPart, lonRef);
+      const lat = dmsToDecimal(match[1]);
+      const lon = dmsToDecimal(match[2]);
       return [lat, lon];
     }
 
-    // Tandai titik
-    document.getElementById('markPoints').addEventListener('click', () => {
+    // Menandai titik & membuat polyline + tabel
+    document.getElementById("markPoints").addEventListener("click", () => {
+      const textareas = document.querySelectorAll("#coordinate-inputs textarea");
+      let coords = [];
+      markers.forEach((m) => map.removeLayer(m));
+      if (polyline) map.removeLayer(polyline);
       markers = [];
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Marker) map.removeLayer(layer);
-      });
 
-      const textareas = document.querySelectorAll('#coordinate-inputs textarea');
-      let lastCoord = null;
+      const tableBody = document.getElementById("pointsTableBody");
+      tableBody.innerHTML = "";
 
       textareas.forEach((ta, i) => {
         const coord = parseCoordinate(ta.value);
         if (coord) {
-          const marker = L.marker(coord).addTo(map).bindPopup(`Titik ${i + 1}`).openPopup();
-          lastCoord = coord;
-          markers.push({
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [coord[1], coord[0]] },
-            properties: {
-              name: `Titik ${i + 1}`,
-              timestamp: new Date().toISOString(),
-              mode: currentMode
-            }
-          });
+          const marker = L.marker(coord, { draggable: true })
+            .addTo(map)
+            .bindPopup(`Titik ${i + 1}`);
+          markers.push(marker);
+          coords.push(coord);
+
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="py-2 px-3 border-b">${i + 1}</td>
+            <td class="py-2 px-3 border-b">${ta.value}</td>
+            <td class="py-2 px-3 border-b">${coord[0].toFixed(6)}, ${coord[1].toFixed(6)}</td>
+            <td class="py-2 px-3 border-b">${currentMode}</td>
+            <td class="py-2 px-3 border-b">${new Date().toLocaleString()}</td>`;
+          tableBody.appendChild(tr);
+        } else {
+          alert(`Koordinat ${i + 1} tidak valid!`);
         }
       });
 
-      if (lastCoord) map.flyTo(lastCoord, 10);
+      if (coords.length > 1) {
+        polyline = L.polyline(coords, { color: "blue" }).addTo(map);
+      }
+      if (coords.length > 0) map.fitBounds(L.latLngBounds(coords));
+      updateGeoJSON(coords);
     });
 
-    // Download GeoJSON
-    document.getElementById('downloadGeoJSON').addEventListener('click', () => {
-      if (markers.length === 0) return alert('Belum ada titik yang ditandai!');
-      const geojson = { type: 'FeatureCollection', features: markers };
-      const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/geo+json' });
+    // Update dan download GeoJSON
+    function updateGeoJSON(coords) {
+      if (!coords || coords.length === 0) return;
+      window.currentGeoJSON = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "LineString",
+              coordinates: coords.map((c) => [c[1], c[0]]),
+            },
+            properties: { created_at: new Date().toISOString(), mode: currentMode },
+          },
+        ],
+      };
+    }
+
+    document.getElementById("downloadGeoJSON").addEventListener("click", () => {
+      if (!window.currentGeoJSON) return alert("Belum ada titik yang ditandai!");
+      const blob = new Blob([JSON.stringify(window.currentGeoJSON, null, 2)], {
+        type: "application/geo+json",
+      });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = 'titik-peta.geojson';
+      a.download = "multi-titik.geojson";
       a.click();
       URL.revokeObjectURL(url);
     });
